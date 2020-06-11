@@ -1,0 +1,60 @@
+From bb6d6a986ee4d5b1cd6acb9ec0d2b7c4099ead49 Mon Sep 17 00:00:00 2001
+From: Tamas Szucs <tamas.szucs@u-blox.com>
+Date: Wed, 4 Jul 2018 16:38:15 +0200
+Subject: [PATCH] apalis-tk1: disable lvds and disable dc warnings
+
+Disable LVDS and some intrusive warnings for headless setups.
+
+Signed-off-by: Tamas Szucs <tamas.szucs@u-blox.com>
+---
+ arch/arm/boot/dts/tegra124-platforms/tegra124-apalis-displays.dtsi | 2 +-
+ drivers/video/tegra/dc/dc.c                                        | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra124-platforms/tegra124-apalis-displays.dtsi b/arch/arm/boot/dts/tegra124-platforms/tegra124-apalis-displays.dtsi
+index a951d3e21927..15c34673346e 100644
+--- a/arch/arm/boot/dts/tegra124-platforms/tegra124-apalis-displays.dtsi
++++ b/arch/arm/boot/dts/tegra124-platforms/tegra124-apalis-displays.dtsi
+@@ -8,7 +8,7 @@
+ 		};
+ 
+ 		lvds:lvds {
+-			status = "okay";
++			status = "disabled";
+ 			display {
+ 				status = "okay";
+ 				disp-default-out {
+diff --git a/drivers/video/tegra/dc/dc.c b/drivers/video/tegra/dc/dc.c
+index f654ae64a957..2f291f0cc938 100644
+--- a/drivers/video/tegra/dc/dc.c
++++ b/drivers/video/tegra/dc/dc.c
+@@ -2320,7 +2320,7 @@ static bool _tegra_dc_controller_enable(struct tegra_dc *dc)
+ 	int failed_init = 0;
+ 	int i;
+ 
+-	if (WARN_ON(!dc || !dc->out || !dc->out_ops))
++	if (!dc || !dc->out || !dc->out_ops)
+ 		return false;
+ 
+ 	tegra_dc_unpowergate_locked(dc);
+@@ -2538,7 +2538,7 @@ static bool _tegra_dc_enable(struct tegra_dc *dc)
+ 
+ void tegra_dc_enable(struct tegra_dc *dc)
+ {
+-	if (WARN_ON(!dc || !dc->out || !dc->out_ops))
++	if (!dc || !dc->out || !dc->out_ops)
+ 		return;
+ 
+ 	mutex_lock(&dc->lock);
+@@ -3554,7 +3554,7 @@ static void tegra_dc_shutdown(struct platform_device *ndev)
+ {
+ 	struct tegra_dc *dc = platform_get_drvdata(ndev);
+ 
+-	if (WARN_ON(!dc || !dc->out || !dc->out_ops))
++	if (!dc || !dc->out || !dc->out_ops)
+ 		return;
+ 
+ 	if (!dc->enabled)
+-- 
+2.11.0
+

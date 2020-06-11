@@ -1,0 +1,12 @@
+[Unit]
+Description=B205 board init
+After=default.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/b205/b205.init start
+ExecStop=/opt/b205/b205.init stop
+RemainAfterExit=Yes
+
+[Install]
+WantedBy=default.target

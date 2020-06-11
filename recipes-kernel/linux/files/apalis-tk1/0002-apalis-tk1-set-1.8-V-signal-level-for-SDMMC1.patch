@@ -1,0 +1,27 @@
+From da4bb67e79ec6eb72a7c512b975950a1b42652bb Mon Sep 17 00:00:00 2001
+From: Tamas Szucs <tamas.szucs@u-blox.com>
+Date: Wed, 29 Nov 2017 18:26:40 +0100
+Subject: [PATCH] apalis-tk1: set 1.8 V signal level for SDMMC1
+
+Signed-off-by: Tamas Szucs <tamas.szucs@u-blox.com>
+---
+ arch/arm/mach-tegra/board-apalis-tk1-sdhci.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-tegra/board-apalis-tk1-sdhci.c b/arch/arm/mach-tegra/board-apalis-tk1-sdhci.c
+index 2c746d2..af111aa 100644
+--- a/arch/arm/mach-tegra/board-apalis-tk1-sdhci.c
++++ b/arch/arm/mach-tegra/board-apalis-tk1-sdhci.c
+@@ -109,6 +109,9 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
+ 	.tap_delay		= 0,
+ 	.trim_delay		= 0x2,
+ /*	.trim_delay		= 0x3, */
++	.mmc_data = {
++		.ocr_mask	= MMC_OCR_1V8_MASK,
++	},
+ /* TBD
+ 	.ddr_clk_limit		= 41000000, */
+ 	.uhs_mask		= MMC_UHS_MASK_DDR50,
+-- 
+2.11.0
+

@@ -1,0 +1,17 @@
+Common targets are:
+    core-image-minimal
+    core-image-sato
+    meta-toolchain
+    adt-installer
+    meta-ide-support
+
+You can also run generated qemu images with a command like 'runqemu qemux86'
+
+Toradex targets are:
+    angstrom-lxde-image
+    console-tdx-image
+    angstrom-qt-x11-image
+
+u-blox targets are:
+    ublox-console-image
+    ublox-lab-image

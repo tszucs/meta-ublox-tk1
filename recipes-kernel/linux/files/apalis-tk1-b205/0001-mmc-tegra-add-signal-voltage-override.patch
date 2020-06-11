@@ -1,0 +1,196 @@
+From ae6ba3aa7f15af60af12d07b76d9afeca6ccdb33 Mon Sep 17 00:00:00 2001
+From: Tamas Szucs <tamas.szucs@u-blox.com>
+Date: Fri, 1 Sep 2017 12:03:13 +0200
+Subject: [PATCH] mmc: tegra: add signal voltage override
+
+Add debugfs entry signal_voltage in override_data in order to force the host
+controller to use either 3.3 V or 1.8 V signal level.
+
+Signed-off-by: Tamas Szucs <tamas.szucs@u-blox.com>
+---
+ drivers/mmc/host/sdhci-tegra.c | 141 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 141 insertions(+)
+
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index 252757e..4b9dea5 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -3339,6 +3339,23 @@ static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
+ 	return err;
+ }
+ 
++static int tegra_sdhci_down(struct sdhci_host *sdhci)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
++	struct sdhci_tegra *tegra_host = pltfm_host->priv;
++	int err = 0;
++
++	tegra_sdhci_set_clock(sdhci, 0);
++
++	/* Disable the power rails if any */
++	err = tegra_sdhci_configure_regulators(tegra_host,
++		CONFIG_REG_DIS, 0, 0);
++	if (err)
++		dev_err(mmc_dev(sdhci->mmc),
++		"Regulators disable in suspend failed %d\n", err);
++	return err;
++}
++
+ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+@@ -3397,6 +3414,48 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
+ 	return 0;
+ }
+ 
++static int tegra_sdhci_up(struct sdhci_host *sdhci)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
++	struct sdhci_tegra *tegra_host = pltfm_host->priv;
++	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
++	struct tegra_sdhci_platform_data *plat = pdev->dev.platform_data;
++	unsigned int signal_voltage = 0;
++	int err;
++
++	/* Setting the min identification clock of freq 400KHz */
++	tegra_sdhci_set_clock(sdhci, 400000);
++
++	/* Enable the power rails if any */
++	err = tegra_sdhci_configure_regulators(tegra_host,
++		CONFIG_REG_EN, 0, 0);
++	if (err) {
++		dev_err(mmc_dev(sdhci->mmc),
++			"Regulators enable in resume failed %d\n", err);
++		return err;
++	}
++	if (tegra_host->vdd_io_reg) {
++		if (plat && (plat->mmc_data.ocr_mask &
++			SDHOST_1V8_OCR_MASK))
++			signal_voltage = MMC_SIGNAL_VOLTAGE_180;
++		else
++			signal_voltage = MMC_SIGNAL_VOLTAGE_330;
++		tegra_sdhci_signal_voltage_switch(sdhci,
++			signal_voltage);
++	}
++
++	/* Reset the controller and power on if MMC_KEEP_POWER flag is set*/
++	if (sdhci->mmc->pm_flags & MMC_PM_KEEP_POWER) {
++		tegra_sdhci_reset(sdhci, SDHCI_RESET_ALL);
++		sdhci_writeb(sdhci, SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
++		sdhci->pwr = 0;
++
++		tegra_sdhci_do_calibration(sdhci, signal_voltage);
++	}
++
++	return 0;
++}
++
+ static void tegra_sdhci_post_resume(struct sdhci_host *sdhci)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+@@ -3627,6 +3686,78 @@ static int set_tap_override_value(void *data, u64 value)
+ 	}
+ 	return 0;
+ }
++
++static int show_signal_voltage_override_value(void *data, u64 *value)
++{
++	struct sdhci_host *host = (struct sdhci_host *)data;
++	if (host != NULL) {
++		struct platform_device *pdev =
++			to_platform_device(mmc_dev(host->mmc));
++		if (pdev != NULL) {
++			struct tegra_sdhci_platform_data *plat =
++				pdev->dev.platform_data;
++			if (plat != NULL) {
++				*value = MMC_SIGNAL_VOLTAGE_330;
++				if (plat->mmc_data.ocr_mask & MMC_OCR_1V8_MASK)
++					*value = MMC_SIGNAL_VOLTAGE_180;
++			}
++		}
++	}
++	return 0;
++}
++
++static int set_signal_voltage_override_value(void *data, u64 value)
++{
++	struct sdhci_host *host;
++	struct sdhci_pltfm_host *pltfm_host;
++	struct sdhci_tegra *tegra_host;
++	struct platform_device *pdev;
++	struct tegra_sdhci_platform_data *plat;
++
++	host = (struct sdhci_host *)data;
++	if (host == NULL) return 0;
++	pltfm_host = sdhci_priv(host);
++	if (pltfm_host == NULL) return 0;
++	tegra_host = pltfm_host->priv;
++	if (tegra_host == NULL) return 0;
++	if (tegra_host->card_present) {
++		dev_err(mmc_dev(host->mmc),
++			"Card present, remove card first\n");
++		return -EPERM;
++	}
++	pdev = to_platform_device(mmc_dev(host->mmc));
++	if (pdev == NULL) return 0;
++	plat = pdev->dev.platform_data;
++	if (plat == NULL) return 0;
++
++	switch (value) {
++	case MMC_SIGNAL_VOLTAGE_180:
++		if (plat->mmc_data.ocr_mask & MMC_OCR_1V8_MASK)
++			return 0;
++		tegra_sdhci_down(host);
++		plat->mmc_data.ocr_mask = MMC_OCR_1V8_MASK;
++		tegra_host->vddio_min_uv = SDHOST_LOW_VOLT_MIN;
++		tegra_host->vddio_max_uv = SDHOST_LOW_VOLT_MAX;
++		tegra_sdhci_up(host);
++		dev_info(mmc_dev(host->mmc), "Signal voltage 1.8 V\n");
++		break;
++	case MMC_SIGNAL_VOLTAGE_330:
++		if (plat->mmc_data.ocr_mask & MMC_OCR_3V3_MASK)
++			return 0;
++		tegra_sdhci_down(host);
++		plat->mmc_data.ocr_mask = MMC_OCR_3V3_MASK;
++		tegra_host->vddio_min_uv = SDHOST_HIGH_VOLT_3V3;
++		tegra_host->vddio_max_uv = SDHOST_HIGH_VOLT_MAX;
++		tegra_sdhci_up(host);
++		dev_info(mmc_dev(host->mmc), "Signal voltage 3.3 V\n");
++		break;
++	default:
++		dev_err(mmc_dev(host->mmc), "Invalid signal voltage\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
+ DEFINE_SIMPLE_ATTRIBUTE(sdhci_polling_period_fops, show_polling_period,
+ 		set_polling_period, "%llu\n");
+ DEFINE_SIMPLE_ATTRIBUTE(sdhci_active_load_high_threshold_fops,
+@@ -3641,6 +3772,9 @@ DEFINE_SIMPLE_ATTRIBUTE(sdhci_override_trim_data_fops,
+ DEFINE_SIMPLE_ATTRIBUTE(sdhci_override_tap_data_fops,
+ 		show_tap_override_value,
+ 		set_tap_override_value, "%llu\n");
++DEFINE_SIMPLE_ATTRIBUTE(sdhci_override_signal_voltage_fops,
++		show_signal_voltage_override_value,
++		set_signal_voltage_override_value, "%llu\n");
+ 
+ static void sdhci_tegra_error_stats_debugfs(struct sdhci_host *host)
+ {
+@@ -3711,6 +3845,13 @@ static void sdhci_tegra_error_stats_debugfs(struct sdhci_host *host)
+ 		saved_line = __LINE__;
+ 		goto err_node;
+ 	}
++
++	if (!debugfs_create_file("signal_voltage", 0644,
++				dfs_root, (void *)host,
++				&sdhci_override_signal_voltage_fops)) {
++		saved_line = __LINE__;
++		goto err_node;
++	}
+ 	if (IS_QUIRKS2_DELAYED_CLK_GATE(host)) {
+ 		host->clk_gate_tmout_ticks = -1;
+ 		if (!debugfs_create_u32("clk_gate_tmout_ticks",
+-- 
+2.1.4
+

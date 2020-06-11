@@ -1,0 +1,38 @@
+From 283b3cde364c73980449033c48e43887234abcfb Mon Sep 17 00:00:00 2001
+From: Tamas Szucs <tamas.szucs@u-blox.com>
+Date: Tue, 12 Mar 2019 10:57:13 +0100
+Subject: [PATCH 3/3] ARM: tegra: apalis-tk1: limit sdmmc1 f_max to 200 MHz
+
+Signed-off-by: Tamas Szucs <tamas.szucs@u-blox.com>
+---
+ arch/arm/boot/dts/tegra124-apalis-eval.dts      | 1 +
+ arch/arm/boot/dts/tegra124-apalis-v1.2-eval.dts | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/tegra124-apalis-eval.dts b/arch/arm/boot/dts/tegra124-apalis-eval.dts
+index 7e2b9cf8..4d56ba7d 100644
+--- a/arch/arm/boot/dts/tegra124-apalis-eval.dts
++++ b/arch/arm/boot/dts/tegra124-apalis-eval.dts
+@@ -194,6 +194,7 @@
+ 		cd-gpios = <&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_LOW>;
+ 		bus-width = <4>;
+ 		vqmmc-supply = <&vddio_sdmmc1>;
++		max-frequency = <200000000>;
+ 	};
+ 
+ 	/* Apalis SD1 */
+diff --git a/arch/arm/boot/dts/tegra124-apalis-v1.2-eval.dts b/arch/arm/boot/dts/tegra124-apalis-v1.2-eval.dts
+index 4f2e4766..ad4e7705 100644
+--- a/arch/arm/boot/dts/tegra124-apalis-v1.2-eval.dts
++++ b/arch/arm/boot/dts/tegra124-apalis-v1.2-eval.dts
+@@ -158,6 +158,7 @@
+ 		cd-gpios = <&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_LOW>;
+ 		bus-width = <4>;
+ 		vqmmc-supply = <&vddio_sdmmc1>;
++		max-frequency = <200000000>;
+ 	};
+ 
+ 	/* Apalis SD1 */
+-- 
+2.11.0
+

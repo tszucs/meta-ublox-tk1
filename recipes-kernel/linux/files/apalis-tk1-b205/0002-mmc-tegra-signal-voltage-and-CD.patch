@@ -1,0 +1,47 @@
+diff --git a/arch/arm/mach-tegra/board-apalis-tk1-sdhci.c b/arch/arm/mach-tegra/board-apalis-tk1-sdhci.c
+index 8b9c760..d1634ae 100644
+--- a/arch/arm/mach-tegra/board-apalis-tk1-sdhci.c
++++ b/arch/arm/mach-tegra/board-apalis-tk1-sdhci.c
+@@ -109,6 +109,9 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
+ 	.tap_delay		= 0,
+ 	.trim_delay		= 0x2,
+ /*	.trim_delay		= 0x3, */
++	.mmc_data = {
++		.ocr_mask	= MMC_OCR_1V8_MASK,
++	},
+ /* TBD
+ 	.ddr_clk_limit		= 41000000, */
+ 	.uhs_mask		= MMC_UHS_MASK_DDR50,
+@@ -121,13 +124,16 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
+ #ifdef APALIS_TK1_V10
+ 	.cd_gpio		= -1,
+ #else
+-	.cd_gpio		= TEGRA_GPIO_PV2,
++	.cd_gpio		= -1 /*TEGRA_GPIO_PV2*/,
+ #endif
+ 	.wp_gpio		= -1,
+ 	.power_gpio		= -1,
+ 	.tap_delay		= 0,
+ /*	.trim_delay		= 0x2, */
+ 	.trim_delay		= 0x3,
++	.mmc_data = {
++		.ocr_mask	= MMC_OCR_1V8_MASK,
++	},
+ 	.uhs_mask		= MMC_UHS_MASK_DDR50,
+ 	.calib_3v3_offsets	= 0x7676,
+ 	.calib_1v8_offsets	= 0x7676,
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index 252757e..3f4ebf4 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -4350,6 +4350,10 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
+ 	 */
+ 	host->mmc->caps |= MMC_CAP_NEEDS_POLL;
+ #endif /* APALIS_TK1_V10 */
++	if (plat->cd_gpio == -1 && !plat->mmc_data.built_in) {
++		dev_info(mmc_dev(host->mmc), "MMC_CAP_NEEDS_POLL\n");
++		host->mmc->caps |= MMC_CAP_NEEDS_POLL;
++	}
+ 
+ 	host->mmc->caps |= MMC_CAP_ERASE;
+ 	/* enable 1/8V DDR capable */

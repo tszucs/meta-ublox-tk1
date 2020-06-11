@@ -1,0 +1,204 @@
+#!/bin/bash
+
+# Default configuration
+B205_CONF=/etc/default/b205
+source $B205_CONF || exit 1
+
+# GPIOs
+GPIO_SHO_VCCMAIN_EN=904
+GPIO_VIO1_SEL=238
+GPIO_VIO1_EN=237
+GPIO_VIO2_SEL=234
+GPIO_VIO2_EN=224
+GPIO_VCC_SHO_EN=59
+GPIO_5V_SHO_EN=58
+GPIO_SDIO_SW=906
+GPIO_PD1=955		# WL_PDn
+GPIO_PD2=958		# BT_PDn
+GPIO_SEL1=961		# SD_VDD_SEL
+GPIO_SEL2=924		# SD_DES
+GPIO_SEL3=956		# PCIE_EN
+GPIO_SHO_BT_EN=966
+
+GPIO_SPI_EN=953
+GPIO_SHO_RST=960
+
+GPIO_EN=989
+
+GPIO_SWITCH1=957
+GPIO_SWITCH2=959
+GPIO_SWITCH3=958
+
+GPIO_BOOT0=961
+GPIO_BOOT1=924
+GPIO_BOOT2=956
+
+gpio_set_value()
+{
+	if [ ! -e /sys/class/gpio/gpio${1} ]; then
+		echo $1 > /sys/class/gpio/export
+		echo out > /sys/class/gpio/gpio${1}/direction
+	fi
+	echo $2 > /sys/class/gpio/gpio${1}/value
+}
+
+disable_jody()
+{
+	ADDR=$(lspci -Dn | grep 14e4:4355 | cut -d\  -f1)
+	if [ -n "$ADDR" ]; then
+		echo 1 > /sys/bus/pci/devices/$ADDR/remove
+	fi
+	gpio_set_value $GPIO_PD1 0
+	gpio_set_value $GPIO_PD2 0
+	gpio_set_value $GPIO_SHO_BT_EN 0
+	gpio_set_value $GPIO_VIO1_EN 0
+	gpio_set_value $GPIO_VIO2_EN 0
+	gpio_set_value $GPIO_VCC_SHO_EN 0
+	gpio_set_value $GPIO_SHO_VCCMAIN_EN 0
+}
+
+disable_vera()
+{
+	modprobe -r cw_llc
+
+	gpio_set_value $GPIO_SHO_RST 1
+	gpio_set_value $GPIO_VIO2_EN 0
+	gpio_set_value $GPIO_VCC_SHO_EN 0
+	gpio_set_value $GPIO_5V_SHO_EN 0
+	gpio_set_value $GPIO_SHO_VCCMAIN_EN 0
+}
+
+enable_jody()
+{
+	# SHO_VCCMAIN_EN: enable 8V for VCC
+	gpio_set_value $GPIO_SHO_VCCMAIN_EN 1
+
+	# DAC set (I2C): adjust VCC to 3.3V
+	i2cget -f -y 0x02 0x0C 0x00 w >/dev/null
+	i2cset -f -y 0x02 0x0C 0x07 0xF4
+
+	# VIOx_SEL: select 1.8V or 3.3V VIO
+	gpio_set_value $GPIO_VIO1_SEL $VIO_SD_SEL
+	gpio_set_value $GPIO_VIO2_SEL $VIO_SEL_JODY
+
+	# VCC_SHO_EN: enable VCC
+	gpio_set_value $GPIO_VCC_SHO_EN 1
+
+	# VIOx_EN: enable VIO
+	gpio_set_value $GPIO_VIO1_EN 1
+	gpio_set_value $GPIO_VIO2_EN 1
+
+	# bootstrapping (inverted)
+	if [ "$1" == "PCIE" ]; then
+		gpio_set_value $GPIO_SEL1 0
+		gpio_set_value $GPIO_SEL2 0
+		gpio_set_value $GPIO_SEL3 0
+	elif [ "$1" == "SDIO" ]; then
+		gpio_set_value $GPIO_SEL1 $VIO_SD_SEL
+		gpio_set_value $GPIO_SEL2 1
+		gpio_set_value $GPIO_SEL3 0
+		# SDIO_SW: A -> B (SHO_SDIO)
+		gpio_set_value $GPIO_SDIO_SW 0
+	elif [ "$1" == "SDIO2" ]; then
+		gpio_set_value $GPIO_SEL1 $VIO_SD_SEL
+		gpio_set_value $GPIO_SEL2 1
+		gpio_set_value $GPIO_SEL3 0
+		# SDIO_SW: A -> C (SHO2_SDIO)
+		gpio_set_value $GPIO_SDIO_SW 1
+	else
+		echo "B205 configuration error!"
+	fi
+
+	# WL/BT enable
+	gpio_set_value $GPIO_PD1 1
+	gpio_set_value $GPIO_PD2 1
+
+	if [ "$1" == "PCIE" ]; then
+		usleep 200000
+		echo 1 > /sys/bus/pci/rescan
+	fi
+
+	# BT UART enable
+	gpio_set_value $GPIO_SHO_BT_EN 1
+}
+
+enable_vera()
+{
+	gpio_set_value $GPIO_SHO_RST 1
+
+	# SHO_VCCMAIN_EN: enable 8V for VCC
+	gpio_set_value $GPIO_SHO_VCCMAIN_EN 1
+
+	# DAC set (I2C): adjust VCC to 3.3V
+	i2cget -f -y 0x02 0x0C 0x00 w >/dev/null
+	i2cset -f -y 0x02 0x0C 0x07 0xF4
+
+	# VIOx_SEL: select 1.8V or 3.3V VIO
+	gpio_set_value $GPIO_VIO2_SEL $VIO_SEL_VERA
+
+	# VCC_SHO_EN: enable VCC
+	gpio_set_value $GPIO_VCC_SHO_EN 1
+
+	# VIOx_EN: enable VIO
+	gpio_set_value $GPIO_VIO2_EN 1
+
+	# 5V_SHO_EN: enable 5V
+	gpio_set_value $GPIO_5V_SHO_EN 1
+
+	# enable GPIOs to control switches
+	gpio_set_value $GPIO_EN 1
+
+	# bootstrapping (PT1: BOOT0/BOOT1 swapped)
+	if [ "$1" == "SPI" ]; then
+		echo "Slave mode SPI boot"
+		# SPI HOST (slow) for PT1 (set '1' to disable)
+		gpio_set_value $GPIO_BOOT0 0
+		gpio_set_value $GPIO_BOOT1 1
+		gpio_set_value $GPIO_BOOT2 0
+
+		# SPI enable
+		gpio_set_value $GPIO_SPI_EN 1
+		# set SPI for Host-VERA
+		gpio_set_value $GPIO_SWITCH1 0 # Jumper Host-Flash
+		gpio_set_value $GPIO_SWITCH2 1 # Jumper Host-VERA
+		gpio_set_value $GPIO_SWITCH3 1 # Jumper VERA-Flash (inverted)
+	elif [ "$1" == "USB" ]; then
+		echo "USB-DFU boot"
+		# USB-DFU (set '1' to disable)
+		gpio_set_value $GPIO_BOOT0 1
+		gpio_set_value $GPIO_BOOT1 1
+		gpio_set_value $GPIO_BOOT2 0
+	else
+		echo "B205 configuration error!"
+	fi
+
+	# reset
+	usleep 100000
+	gpio_set_value $GPIO_SHO_RST 0
+}
+
+case "$1" in
+  start)
+	if [ _"$EVK_USED" == _"JODY" ]; then
+		enable_jody ${HOSTIF_JODY^^}
+	elif [ _"$EVK_USED" == _"VERA" ]; then
+		enable_vera ${HOSTIF_VERA^^}
+	else
+		echo "B205 configuration error!"
+		exit 1
+	fi
+	;;
+  stop)
+	if [ _"$EVK_USED" == _"JODY" ]; then
+		disable_jody
+	elif [ _"$EVK_USED" == _"VERA" ]; then
+		disable_vera
+	else
+		echo "B205 configuration error!"
+		exit 1
+	fi
+	;;
+  *)
+	echo "Usage: $0 {start|stop}"
+	exit 1
+esac

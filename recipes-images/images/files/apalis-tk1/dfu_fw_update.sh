@@ -1,0 +1,1 @@
+../library/dfu_fw_update.sh

@@ -1,0 +1,25 @@
+setenv set_blkcnt 'setexpr blkcnt ${filesize} + 0x1ff && setexpr blkcnt ${blkcnt} / 0x200'
+#workaround U-Boot counting in hex and split did in decimal
+setenv incr_decimal 'setexpr filenum ${filenum} + 1; setexpr filenrlow1 ${filenum} % 0x100; setexpr filenrlow2 ${filenrlow1} % 0x10; test ${filenrlow1} -eq "9a" && test ${filenrlow2} -ne "9" && setexpr filenum ${filenum} + 0x66; test ${filenrlow1} -ne "9a" && test ${filenrlow2} -eq "a" && setexpr filenum ${filenum} + 0x6; true'
+setenv set_nextnum 'run incr_decimal; setexpr blkstart ${blkstart} + ${blkcnt}'
+
+setenv check_configblock 'setexpr toradex_oui_addr ${fdt_addr_r} + 8; mw.l ${kernel_addr_r} 0x002d1400; mmc dev 0 1; for off in 7ff fff 1fff 3fff 7fff ffff 1ffff; do mmc read ${fdt_addr_r} ${off} 1 && setenv conf_blk_offset $off; done; cmp.b ${kernel_addr_r} ${toradex_oui_addr} 3'
+
+setenv cp_file_chunk 'tftpboot ${fdt_addr_r} ${board_name}/root.ext4-${filenum} || setenv filesize 0; run set_blkcnt; mmc dev 0 0 && mmc write ${fdt_addr_r} ${blkstart} ${blkcnt}'
+
+setenv update_uboot 'tftpboot ${fdt_addr_r} ${board_name}/${board_name}.img && run set_blkcnt && mmc dev 0 1 && mmc write ${fdt_addr_r} 0x0 ${blkcnt}'
+
+setenv update_kernel 'tftpboot ${fdt_addr_r} ${board_name}/zImage && fatwrite mmc 0:1 ${fdt_addr_r} zImage ${filesize}'
+
+setenv update_fdt 'tftpboot ${fdt_addr_r} ${board_name}/${soc}-apalis-${fdt_board}.dtb && fatwrite mmc 0:1 ${fdt_addr_r} ${soc}-apalis-${fdt_board}.dtb ${filesize}'
+
+setenv update_configblock 'run check_configblock; tftpboot ${fdt_addr_r} ${board_name}/configblock.bin && mmc dev 0 1 && mmc write ${fdt_addr_r} ${conf_blk_offset} 1'
+
+setenv update_1 'tftpboot ${fdt_addr_r} ${board_name}/mbr.bin && mmc dev 0 0 && mmc write ${fdt_addr_r} 0x0 0x1'
+setenv update_2 'tftpboot ${fdt_addr_r} ${board_name}/boot.vfat && run set_blkcnt && mmc dev 0 0 && mmc write ${fdt_addr_r} 0x2000 ${blkcnt}'
+#do it in chunks of 64M to fit into DDR RAM of the smallest module
+setenv update_rootfs 'setenv filesize 4000000; setenv filenum 100; setenv blkstart a000; while test ${filesize} -eq "4000000"; do run cp_file_chunk; run set_nextnum; done'
+
+setenv update 'run update_uboot; run update_1; run update_2; run update_kernel; run update_fdt; run update_rootfs; reset'
+
+echo 'enter "run update" to update the entire module'

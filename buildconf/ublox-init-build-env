@@ -1,0 +1,135 @@
+#
+# Copyright (C) 2019 u-blox AG
+#
+
+# Defaults
+OPT_M=apalis-tk1
+OPT_N=apalis-tk1
+OPT_R=""
+OPT_S=""
+OPT_X=""
+
+BUILD_DIR=build
+LAYER_DIR=layers
+
+INTERACTIVE=y
+
+#
+# Print help
+#
+print_help() {
+	cat << EOF
+Usage: source $BASH_SOURCE [OPTION]... [BUILD_DIR]
+Initialize u-blox apalis-tk1 yocto build environment
+
+Options:
+  -b                           batched (non-interactive) mode,
+                               automatically take default answers to questions
+  -h                           display this help and exit
+  -m <MACHINE>                 select target machine, available:
+                               [apalis-tk1], apalis-tk1-b205,
+                               apalis-tk1-mainline
+  -n <HOSTNAME>                select target hostname, available:
+                               [apalis-tk1]
+  -s <URL>                     fetcher host URL for LULA-bound packages
+  -x <PARAMS>                  fetcher extra parameters
+
+Examples:
+  source $BASH_SOURCE ./build
+  source $BASH_SOURCE -m apalis-tk1
+  source $BASH_SOURCE -m apalis-tk1 -s svn://host -x "user=jeff;pswd=12345"
+
+EOF
+}
+
+#
+# Confirm user's agreement to terms of usage
+#
+terms_of_usage() {
+	local license
+
+	# List included licenses
+	for license in ${LAYER_DIR}/*/files/additional-licenses/*; do
+		more $license
+		echo
+		while read -n 1 -p "Confirm agreement to contents of $(basename ${license})? (Y/n)" -r answer; do
+			echo
+			case $answer in
+			  y|Y)
+				break;;
+			  n|N)
+				return 1;;
+			  *)
+				[ -z $answer ] && break;;
+			esac
+		done
+	done
+}
+
+#
+# MAIN
+#
+OPTIND=1
+while getopts ":bhm:n:r:s:x:" opt; do
+	case $opt in
+	  b)
+		INTERACTIVE=n
+		;;
+	  h)
+		print_help
+		return 0
+		;;
+	  m)
+		OPT_M=$OPTARG
+		;;
+	  n)
+		OPT_N=$OPTARG
+		;;
+	  s)
+		OPT_S=$OPTARG
+		;;
+	  x)
+		OPT_X=";$OPTARG"
+		;;
+	  \?)
+		echo "Invalid option: $OPTARG" >&2
+		return 1
+		;;
+	  :)
+		echo "Option -$OPTARG requires an argument" >&2
+		return 1
+		;;
+	esac
+done
+shift $((OPTIND-1))
+for NOPTARG in $*; do
+	BUILD_DIR="$NOPTARG"
+done
+
+if [ _"$OPT_M" == _"apalis-tk1" -o \
+     _"$OPT_M" == _"apalis-tk1-b205" -o \
+     _"$OPT_M" == _"apalis-tk1-mainline" ]
+then
+	export TEMPLATECONF="../meta-ublox-tk1/buildconf"
+else
+	echo "Unrecognized machine selected: $OPT_M" >&2
+	return 1
+fi
+
+# Confirm user's agreement to terms of usage
+[ _"$INTERACTIVE" == _"n" ] || terms_of_usage || return $?
+
+export MACHINE=$OPT_M
+export UBLOX_HOSTNAME=$OPT_N
+rm -f	build/conf/bblayers.conf \
+	build/conf/templateconf.cfg
+source layers/openembedded-core/oe-init-build-env $BUILD_DIR
+
+export UBLOX_GIT=""
+export UBLOX_GIT_PROTOCOL=""
+export ACCEPT_UBLOX_ELULA=1
+export LULA_DL_URL="$OPT_S"
+export LULA_DL_PARAMS="$OPT_X"
+export BB_ENV_EXTRAWHITE="$BB_ENV_EXTRAWHITE UBLOX_GIT UBLOX_GIT_PROTOCOL ACCEPT_UBLOX_ELULA LULA_DL_URL LULA_DL_PARAMS UBLOX_HOSTNAME"
+
+return 0

@@ -1,0 +1,8 @@
+OpenEmbedded/Yocto Software Layer for Toradex Apalis TK1 Images
+===============================================================
+
+This layer provides recipes used for images targeting the ARM based
+Toradex computer on module (COM) featuring the NVIDIA Tegra K1 SoC.
+For more information on available Toradex COMs please visit:
+
+https://www.toradex.com/computer-on-modules

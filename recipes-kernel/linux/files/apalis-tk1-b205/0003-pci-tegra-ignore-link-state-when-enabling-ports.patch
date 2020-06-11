@@ -1,0 +1,34 @@
+From 3c69aef0e4707c81be3521bb0165e4caa9b74495 Mon Sep 17 00:00:00 2001
+From: Gregor Schneider <gregor.schneider@u-blox.com>
+Date: Fri, 7 Apr 2017 16:08:30 +0200
+Subject: [PATCH] pci-tegra: ignore link state when enabling ports
+
+This makes bridge ports available and subsequently allows to add PCIe devices later using "echo 1 > /sys/bus/pci/rescan"
+Loosely based on https://devtalk.nvidia.com/default/topic/997845/force-rescan-of-pcie-bus-/
+---
+ drivers/pci/host/pci-tegra.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index e0e7998f57f3..63cafd57baa0 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -1671,12 +1671,15 @@ static void tegra_pcie_add_port(int index, u32 offset, u32 reset_reg)
+ 	pp->base = tegra_pcie.regs + offset;
+ 	pp->link_up = tegra_pcie_check_link(pp, index, reset_reg);
+ 
++	pr_info("PCIE: port %d: ignoring link state, enabling port anyway (tm-sho)\n", index);
++#if 0
+ 	if (!pp->link_up) {
+ 		pp->base = NULL;
+ 		pr_info("PCIE: port %d: link down, ignoring\n", index);
+ 		tegra_pcie_disable_ctlr(index);
+ 		return;
+ 	}
++#endif
+ 	tegra_pcie_enable_rp_features(index);
+ 
+ 	tegra_pcie.num_ports++;
+-- 
+2.11.0
+

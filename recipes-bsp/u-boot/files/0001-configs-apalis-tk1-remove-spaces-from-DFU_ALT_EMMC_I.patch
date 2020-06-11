@@ -1,0 +1,36 @@
+From cc8c729eafca0bb63e14fe94f4d7256d6bec7a5c Mon Sep 17 00:00:00 2001
+From: Robert Noack <robert.noack@u-blox.com>
+Date: Thu, 16 Feb 2017 18:07:49 +0100
+Subject: [PATCH] configs/apalis-tk1: remove spaces from DFU_ALT_EMMC_INFO
+
+reason:
+uboot v2016.11 cannot handle the extra spaces.
+with this settings, the dfu command will always fail.
+
+Signed-off-by: Robert Noack <robert.noack@u-blox.com>
+---
+ include/configs/apalis-tk1.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/include/configs/apalis-tk1.h b/include/configs/apalis-tk1.h
+index b37db80f57..da33c30ce0 100644
+--- a/include/configs/apalis-tk1.h
++++ b/include/configs/apalis-tk1.h
+@@ -73,10 +73,10 @@
+ 	"run emmcboot; setenv fdtfile ${soc}-${fdt_module}-${fdt_board}.dtb && " \
+ 		"run distro_bootcmd"
+ 
+-#define DFU_ALT_EMMC_INFO	"apalis-tk1.img raw 0x0 0x500 mmcpart 1; " \
+-				"boot part 0 1 mmcpart 0; " \
+-				"rootfs part 0 2 mmcpart 0; " \
+-				"zImage fat 0 1 mmcpart 0; " \
++#define DFU_ALT_EMMC_INFO	"apalis-tk1.img raw 0x0 0x500 mmcpart 1;" \
++				"boot part 0 1 mmcpart 0;" \
++				"rootfs part 0 2 mmcpart 0;" \
++				"zImage fat 0 1 mmcpart 0;" \
+ 				"tegra124-apalis-eval.dtb fat 0 1 mmcpart 0"
+ 
+ #define EMMC_BOOTCMD \
+-- 
+2.11.0
+

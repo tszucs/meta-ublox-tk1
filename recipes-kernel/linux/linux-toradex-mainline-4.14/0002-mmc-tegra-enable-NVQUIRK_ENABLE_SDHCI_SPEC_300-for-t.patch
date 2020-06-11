@@ -1,0 +1,28 @@
+From 2a3e75b058ac1ab4ea879303e0a24bc2787abf29 Mon Sep 17 00:00:00 2001
+From: Tamas Szucs <tamas.szucs@u-blox.com>
+Date: Thu, 7 Mar 2019 10:26:33 +0100
+Subject: [PATCH 2/3] mmc: tegra: enable NVQUIRK_ENABLE_SDHCI_SPEC_300 for
+ tegra124 SOCs
+
+Signed-off-by: Tamas Szucs <tamas.szucs@u-blox.com>
+---
+ drivers/mmc/host/sdhci-tegra.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index 5d36b8dc..270942b4 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -411,7 +411,8 @@ static const struct sdhci_pltfm_data sdhci_tegra124_pdata = {
+ 
+ static const struct sdhci_tegra_soc_data soc_data_tegra124 = {
+ 	.pdata = &sdhci_tegra124_pdata,
+-	.nvquirks = NVQUIRK_ENABLE_SDR50 |
++	.nvquirks = NVQUIRK_ENABLE_SDHCI_SPEC_300 |
++		    NVQUIRK_ENABLE_SDR50 |
+ 		    NVQUIRK_ENABLE_DDR50 |
+ 		    NVQUIRK_ENABLE_SDR104 |
+ 		    NVQUIRK_HAS_PADCALIB,
+-- 
+2.11.0
+
